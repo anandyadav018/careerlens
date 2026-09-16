@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------
+  # Frontend Application (Vite + React)
+  # ----------------------------------------
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api/v1
+    depends_on:
+      - server
+    networks:
+      - careerlens-network
+
+  # ----------------------------------------
+  # Backend API Server (Node + Express)
+  # ----------------------------------------
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/careerlens
+      - JWT_ACCESS_SECRET=your_super_secret_access_key
+      - JWT_REFRESH_SECRET=your_super_secret_refresh_key
+      - JWT_ACCESS_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - CLIENT_URL=http://localhost:5173
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./server/uploads:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - careerlens-network
+
+  # ----------------------------------------
+  # MongoDB Database
+  # ----------------------------------------
+  mongodb:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - careerlens-network
+
+volumes:
+  mongo-data:
+
+networks:
+  careerlens-network:
+    driver: bridge
